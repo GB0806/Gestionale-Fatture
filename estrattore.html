@@ -109,7 +109,15 @@
 
   /* ===== KPI ===== */
   .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .kpi-card { padding: 24px 26px; text-align: center; }
+  .kpi-card {
+    padding: 24px 26px; text-align: center; cursor: default;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px) scale(1.015);
+    box-shadow: 0 14px 40px rgba(31,58,110,0.2);
+    background: rgba(255,255,255,0.75);
+  }
   .kpi-valore {
     font-family: 'Space Grotesk', sans-serif; font-weight: 700;
     font-size: 2.4rem; font-variant-numeric: tabular-nums; line-height: 1.1;
@@ -120,7 +128,15 @@
 
   /* ===== Grafici ===== */
   .grafici-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 20px; align-items: stretch; }
-  .grafico-card { padding: 22px 24px; }
+  .grafico-card {
+    padding: 22px 24px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  }
+  .grafico-card:hover {
+    transform: translateY(-3px) scale(1.008);
+    box-shadow: 0 14px 40px rgba(31,58,110,0.2);
+    background: rgba(255,255,255,0.75);
+  }
   .grafico-card h3 {
     font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600;
     color: var(--blu-profondo); margin: 0 0 14px;
@@ -135,11 +151,14 @@
   }
   .riga-riepilogo {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 0; border-bottom: 1px solid rgba(10,42,102,0.08); font-size: 14px;
+    padding: 12px 10px; border-bottom: 1px solid rgba(10,42,102,0.08); font-size: 14px;
+    border-radius: 10px; transition: background 0.2s ease;
   }
+  .riga-riepilogo:hover { background: rgba(27,79,216,0.05); }
   .riga-riepilogo:last-child { border-bottom: none; }
   .riga-riepilogo .nome-foglio { font-weight: 600; color: #1A2340; }
   .riga-riepilogo .dettagli { display: flex; gap: 18px; color: var(--testo-secondario); font-size: 13px; }
+  .riga-riepilogo .dettagli strong { color: var(--blu-profondo); font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
   .riga-riepilogo .totale-euro { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--blu-vivo); font-variant-numeric: tabular-nums; }
 
   /* ===== Tabella risultati ===== */
@@ -147,11 +166,18 @@
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid rgba(10,42,102,0.08); font-size: 13.5px; white-space: nowrap; }
   th { color: var(--testo-secondario); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
-  tr:hover td { background: rgba(27,79,216,0.04); }
+  tr { transition: background 0.15s ease; }
+  tr:hover td { background: rgba(27,79,216,0.05); }
 
-  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
   .badge.emessa { background: rgba(31,170,109,0.12); color: var(--verde); }
+  .badge.emessa::before { background: var(--verde); }
   .badge.non-emessa { background: rgba(228,72,60,0.12); color: var(--rosso); }
+  .badge.non-emessa::before { background: var(--rosso); }
 
   .valore-euro { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -163,6 +189,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .puntino.carico { animation: none; }
+    .kpi-card, .grafico-card, .riga-riepilogo, tr { transition: none; }
   }
 </style>
 </head>
@@ -461,7 +488,8 @@
         const totaleImporto = records.reduce((acc, r) => acc + parseImporto(r[CAMPO_IMPORTO]), 0);
         const nonEmesse = records.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === "non emessa").length;
         const emesse = records.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === "emessa").length;
-        return { nome, totaleImporto, nonEmesse, emesse };
+        const totaleFatture = records.length;
+        return { nome, totaleImporto, nonEmesse, emesse, totaleFatture };
       });
 
       aggiornaGraficoConfronto(risultatiPerFoglio);
@@ -490,11 +518,32 @@
       type: "doughnut",
       data: {
         labels: ["Non emesse", "Emesse"],
-        datasets: [{ data: [d.nonEmesseNelPeriodo, d.emesseNelPeriodo], backgroundColor: ["#E4483C", "#1FAA6D"], borderWidth: 0 }]
+        datasets: [{
+          data: [d.nonEmesseNelPeriodo, d.emesseNelPeriodo],
+          backgroundColor: ["#F0473C", "#22B07D"],
+          hoverBackgroundColor: ["#D93A2F", "#1C9A6C"],
+          borderWidth: 0,
+          borderRadius: 8,
+          spacing: 4,
+          hoverOffset: 6
+        }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11, family: "Inter" } } } }
+        cutout: "68%",
+        animation: { animateRotate: true, animateScale: true, duration: 900, easing: "easeOutQuart" },
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 8, padding: 16, font: { size: 12, family: "Inter", weight: "600" }, color: "#5B6B8C" }
+          },
+          tooltip: {
+            backgroundColor: "rgba(10,42,102,0.94)",
+            titleFont: { family: "Inter", weight: "600", size: 12 },
+            bodyFont: { family: "Inter", size: 12 },
+            padding: 10, cornerRadius: 8, boxPadding: 6, displayColors: true
+          }
+        }
       }
     });
   }
@@ -530,7 +579,18 @@
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11, family: "Inter" } } } },
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 8, padding: 16, font: { size: 12, family: "Inter", weight: "600" }, color: "#5B6B8C" }
+          },
+          tooltip: {
+            backgroundColor: "rgba(10,42,102,0.94)",
+            titleFont: { family: "Inter", weight: "600", size: 12 },
+            bodyFont: { family: "Inter", size: 12 },
+            padding: 10, cornerRadius: 8, boxPadding: 6
+          }
+        },
         scales: {
           yImporto: { position: "left", ticks: { callback: v => "€" + v.toLocaleString("it-IT") } },
           yConteggio: { position: "right", grid: { drawOnChartArea: false }, ticks: { precision: 0 } }
@@ -546,12 +606,21 @@
       <div class="riga-riepilogo">
         <span class="nome-foglio">${r.nome}</span>
         <span class="dettagli">
+          <span><strong>${r.totaleFatture}</strong> fatture totali</span>
           <span>${r.emesse} emesse</span>
           <span>${r.nonEmesse} da emettere</span>
         </span>
         <span class="totale-euro">${formattaEuro(r.totaleImporto)}</span>
       </div>
     `).join("");
+  }
+
+  function badgeStato(valore) {
+    const testo = String(valore ?? "").trim();
+    if (!testo) return "";
+    const negativo = testo.toLowerCase().includes("non");
+    const classe = negativo ? "non-emessa" : "emessa";
+    return `<span class="badge ${classe}">${testo}</span>`;
   }
 
   // ==================== TABELLA RISULTATI ====================
@@ -573,10 +642,9 @@
       colonne.forEach(c => {
         let valore = riga[c];
 
-        if (c === "Emissione fattura") {
-          const emessa = String(valore).trim().toLowerCase() === "emessa";
-          valore = `<span class="badge ${emessa ? "emessa" : "non-emessa"}">${valore}</span>`;
-        } else if (c === "Fine progetto" || c === "Pagamento fattura") {
+        if (c === "Emissione fattura" || c === "Pagamento fattura") {
+          valore = badgeStato(valore);
+        } else if (c === "Fine progetto") {
           valore = formattaData(valore) || "";
         } else if (c === "Tot/parz.") {
           valore = `<span class="valore-euro">${formattaEuro(parseImporto(valore))}</span>`;
