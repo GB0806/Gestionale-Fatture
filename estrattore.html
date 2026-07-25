@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il Tuo Gestionale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --blu-profondo: #0A2A66;
+    --blu-vivo: #1B4FD8;
+    --blu-chiaro: #8FD3FF;
+    --verde: #1FAA6D;
+    --rosso: #E4483C;
+    --testo-secondario: #5B6B8C;
+    --vetro: rgba(255,255,255,0.6);
+    --vetro-bordo: rgba(255,255,255,0.75);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(160deg, #E8F1FF 0%, #F5F9FF 45%, #FFFFFF 100%);
+    color: #1A2340;
+  }
+
+  .bg-decor { position: fixed; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
+  .bg-decor::before, .bg-decor::after {
+    content: ""; position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.35;
+  }
+  .bg-decor::before { width: 520px; height: 520px; background: var(--blu-vivo); top: -180px; left: -120px; }
+  .bg-decor::after { width: 420px; height: 420px; background: var(--blu-chiaro); bottom: -120px; right: -80px; }
+
+  .container { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ===== Header ===== */
+  header { text-align: center; margin-bottom: 36px; }
+
+  .stato-sync {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 600; color: var(--testo-secondario);
+    background: rgba(255,255,255,0.7); padding: 5px 14px; border-radius: 20px;
+    border: 1px solid var(--vetro-bordo); margin-bottom: 18px;
+  }
+  .puntino { width: 7px; height: 7px; border-radius: 50%; background: var(--verde); }
+  .puntino.errore { background: var(--rosso); }
+  .puntino.carico { background: var(--blu-vivo); animation: battito 1.4s infinite ease-in-out; }
+  @keyframes battito { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 4.5vw, 2.75rem);
+    color: var(--blu-profondo);
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .sottotitolo { color: var(--testo-secondario); font-size: 1.05rem; margin: 8px 0 0; }
+
+  /* ===== Card di vetro ===== */
+  .glass {
+    background: var(--vetro);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--vetro-bordo);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(31,58,110,0.12);
+  }
+
+  section { margin-bottom: 24px; }
+  .pannello-filtri { padding: 22px 26px; }
+
+  .riga-controlli { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+  .campo { display: flex; flex-direction: column; gap: 6px; }
+  .campo label { font-size: 12px; font-weight: 600; color: var(--testo-secondario); text-transform: uppercase; letter-spacing: 0.03em; }
+
+  select, input[type=date] {
+    padding: 10px 12px; border: 1px solid rgba(10,42,102,0.15); border-radius: 10px;
+    font-size: 14px; font-family: 'Inter', sans-serif; background: white; color: #1A2340;
+  }
+  select:focus, input:focus, button:focus, .chip:focus {
+    outline: 2px solid var(--blu-vivo); outline-offset: 2px;
+  }
+
+  .chip-group { display: flex; gap: 8px; }
+  .chip {
+    padding: 9px 18px; border-radius: 20px; border: 1px solid rgba(10,42,102,0.15);
+    background: white; cursor: pointer; font-size: 13.5px; font-weight: 600;
+    color: var(--testo-secondario); transition: all 0.15s;
+  }
+  .chip:hover { border-color: var(--blu-vivo); }
+  .chip.attivo.tutte { background: var(--blu-vivo); color: white; border-color: var(--blu-vivo); }
+  .chip.attivo.emessa { background: var(--verde); color: white; border-color: var(--verde); }
+  .chip.attivo.non-emessa { background: var(--rosso); color: white; border-color: var(--rosso); }
+
+  button.cerca {
+    padding: 11px 26px; background: linear-gradient(135deg, var(--blu-vivo), #3D6BFF);
+    color: white; border: none; border-radius: 10px; cursor: pointer;
+    font-size: 14.5px; font-weight: 700; font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 14px rgba(27,79,216,0.3);
+  }
+  button.cerca:hover { filter: brightness(1.08); }
+
+  /* ===== KPI ===== */
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .kpi-card { padding: 24px 26px; text-align: center; }
+  .kpi-valore {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: 2.4rem; font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .kpi-critico .kpi-valore { color: var(--rosso); }
+  .kpi-totale .kpi-valore { color: var(--blu-vivo); }
+  .kpi-label { font-size: 13px; color: var(--testo-secondario); margin-top: 6px; }
+
+  /* ===== Grafici ===== */
+  .grafici-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 20px; align-items: stretch; }
+  .grafico-card { padding: 22px 24px; }
+  .grafico-card h3 {
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600;
+    color: var(--blu-profondo); margin: 0 0 14px;
+  }
+  .grafico-card canvas { max-height: 240px; }
+
+  /* ===== Riepilogo ===== */
+  .riassunto { padding: 22px 26px; }
+  .riassunto h3 {
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600;
+    color: var(--blu-profondo); margin: 0 0 14px;
+  }
+  .riga-riepilogo {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid rgba(10,42,102,0.08); font-size: 14px;
+  }
+  .riga-riepilogo:last-child { border-bottom: none; }
+  .riga-riepilogo .nome-foglio { font-weight: 600; color: #1A2340; }
+  .riga-riepilogo .dettagli { display: flex; gap: 18px; color: var(--testo-secondario); font-size: 13px; }
+  .riga-riepilogo .totale-euro { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--blu-vivo); font-variant-numeric: tabular-nums; }
+
+  /* ===== Tabella risultati ===== */
+  .tabella-risultati { padding: 22px 26px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid rgba(10,42,102,0.08); font-size: 13.5px; white-space: nowrap; }
+  th { color: var(--testo-secondario); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:hover td { background: rgba(27,79,216,0.04); }
+
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .badge.emessa { background: rgba(31,170,109,0.12); color: var(--verde); }
+  .badge.non-emessa { background: rgba(228,72,60,0.12); color: var(--rosso); }
+
+  .valore-euro { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .messaggio { padding: 30px 20px; text-align: center; color: var(--testo-secondario); font-size: 14px; }
+
+  @media (max-width: 720px) {
+    .kpi-grid, .grafici-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .puntino.carico { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-decor"></div>
+
+<div class="container">
+
+  <header>
+    <div class="stato-sync" id="statoSync">
+      <span class="puntino carico" id="puntinoSync"></span>
+      <span id="testoSync">Connessione al foglio...</span>
+    </div>
+    <h1>Il Tuo Gestionale</h1>
+    <p class="sottotitolo">Cerca qualsiasi cosa inerente alle tue fatture</p>
+  </header>
+
+  <section class="pannello-filtri glass">
+    <div class="riga-controlli">
+      <div class="campo">
+        <label>Foglio</label>
+        <select id="selFoglio"></select>
+      </div>
+
+      <div class="campo">
+        <label>Stato fattura</label>
+        <div class="chip-group" id="chipStato">
+          <div class="chip attivo tutte" data-valore="Tutte" tabindex="0">Tutte</div>
+          <div class="chip emessa" data-valore="Emessa" tabindex="0">Emessa</div>
+          <div class="chip non-emessa" data-valore="Non emessa" tabindex="0">Non emessa</div>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label>Da data (fine progetto)</label>
+        <input type="date" id="dataInizio">
+      </div>
+      <div class="campo">
+        <label>A data (fine progetto)</label>
+        <input type="date" id="dataFine">
+      </div>
+
+      <button class="cerca" onclick="carica()">Cerca</button>
+    </div>
+  </section>
+
+  <section class="kpi-grid">
+    <div class="kpi-card kpi-critico glass">
+      <div class="kpi-valore" id="kpiNonEmesse">–</div>
+      <div class="kpi-label" id="kpiNonEmesseLabel">In attesa di dati</div>
+    </div>
+    <div class="kpi-card kpi-totale glass">
+      <div class="kpi-valore" id="kpiTotaleImporto">–</div>
+      <div class="kpi-label" id="kpiTotaleLabel">Totale Tot/parz. nella selezione</div>
+    </div>
+  </section>
+
+  <section class="grafici-grid">
+    <div class="grafico-card glass">
+      <h3>Stato fatture — foglio selezionato</h3>
+      <canvas id="graficoStato"></canvas>
+    </div>
+    <div class="grafico-card glass">
+      <h3>Confronto tra fogli</h3>
+      <canvas id="graficoConfronto"></canvas>
+    </div>
+  </section>
+
+  <section class="riassunto glass">
+    <h3>Riepilogo per foglio</h3>
+    <div id="riepilogoFogli">
+      <div class="messaggio">Caricamento del confronto tra fogli...</div>
+    </div>
+  </section>
+
+  <section class="tabella-risultati glass" id="risultatoContainer">
+    <div class="messaggio">Imposta i filtri e premi "Cerca" per vedere le fatture.</div>
+  </section>
+
+</div>
+
+<script>
+  // ==================== CONFIGURAZIONE ====================
+  const API_KEY = "AIzaSyAq5FfnfxtKj0ktpaIlMWMu06ipA1jcaQA";
+  const SPREADSHEET_ID = "13C3Y20pf3skpD828OpEy9kGZL_9lEQjNXP6DspQWO4s";
+
+  const PATTERN_FOGLIO = /^Fatture\/pagamenti/i;
+  const RANGE_COLONNE = "D6:O2000";
+
+  // Mappatura colonne D:O, gestendo le celle unite (null = colonna gemella da ignorare)
+  const MAPPA_COLONNE = [
+    "N° progetto",       // D
+    null,                // E (unita con D)
+    "Fine progetto",     // F
+    null,                // G (unita con F)
+    "Ente",              // H
+    "Ore erogate",       // I
+    null,                // J (unita con I)
+    "Tot/parz.",         // K
+    null,                // L (unita con K)
+    "Emissione fattura", // M
+    null,                // N (unita con M)
+    "Pagamento fattura"  // O
+  ];
+
+  const CAMPO_DATA_FILTRO = "Fine progetto";
+  const CAMPO_IMPORTO = "Tot/parz.";
+
+  let statoSelezionato = "Tutte";
+  let chartStato = null;
+  let chartConfronto = null;
+
+  // ==================== UTILITY ====================
+  function serialeADate(valore) {
+    if (valore === null || valore === undefined || valore === "") return null;
+    if (typeof valore === "number") {
+      return new Date((valore - 25569) * 86400 * 1000);
+    }
+    const tentativo = new Date(valore);
+    return isNaN(tentativo) ? null : tentativo;
+  }
+
+  function formattaData(valore) {
+    const d = serialeADate(valore);
+    return d ? d.toLocaleDateString("it-IT", { timeZone: "UTC" }) : "";
+  }
+
+  function parseImporto(valore) {
+    if (typeof valore === "number") return valore;
+    if (typeof valore === "string") {
+      const pulito = valore.replace(/[€\s]/g, "").replace(",", ".");
+      const n = parseFloat(pulito);
+      return isNaN(n) ? 0 : n;
+    }
+    return 0;
+  }
+
+  function formattaEuro(valore) {
+    return valore.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+  }
+
+  function impostaStatoSync(tipo, testo) {
+    const puntino = document.getElementById("puntinoSync");
+    puntino.className = "puntino " + tipo;
+    document.getElementById("testoSync").textContent = testo;
+  }
+
+  // Trasforma le righe grezze dell'API in un array di record { campo: valore }
+  function costruisciRecord(righeGrezze) {
+    return righeGrezze
+      .map(riga => {
+        const obj = {};
+        MAPPA_COLONNE.forEach((nomeCampo, i) => {
+          if (nomeCampo !== null) obj[nomeCampo] = riga[i] !== undefined ? riga[i] : "";
+        });
+        return obj;
+      })
+      .filter(r => r["N° progetto"] !== "" && r["N° progetto"] !== null && r["N° progetto"] !== undefined);
+  }
+
+  // ==================== CHIP FILTRO STATO ====================
+  document.querySelectorAll("#chipStato .chip").forEach(chip => {
+    chip.addEventListener("click", selezionaChip);
+    chip.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") selezionaChip.call(chip); });
+  });
+  function selezionaChip() {
+    document.querySelectorAll("#chipStato .chip").forEach(c => c.classList.remove("attivo"));
+    this.classList.add("attivo");
+    statoSelezionato = this.dataset.valore;
+  }
+
+  // ==================== INIZIALIZZAZIONE ====================
+  let nomiFogliValidi = [];
+
+  async function inizializza() {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties.title`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.error) {
+        impostaStatoSync("errore", "Connessione non riuscita");
+        document.getElementById("risultatoContainer").innerHTML =
+          `<div class="messaggio">Non è stato possibile leggere il foglio: ${json.error.message}</div>`;
+        return;
+      }
+
+      nomiFogliValidi = json.sheets.map(s => s.properties.title).filter(n => PATTERN_FOGLIO.test(n));
+
+      const sel = document.getElementById("selFoglio");
+      if (nomiFogliValidi.length > 0) {
+        nomiFogliValidi.forEach(nome => {
+          const opt = document.createElement("option");
+          opt.value = nome; opt.textContent = nome;
+          sel.appendChild(opt);
+        });
+        impostaStatoSync("", "Sincronizzato con Google Sheets");
+      } else {
+        sel.innerHTML = "<option value=''>Nessun foglio trovato</option>";
+        impostaStatoSync("errore", "Nessun foglio compatibile trovato");
+      }
+    } catch (err) {
+      impostaStatoSync("errore", "Connessione non riuscita");
+      document.getElementById("risultatoContainer").innerHTML =
+        `<div class="messaggio">Errore di connessione: ${err}</div>`;
+      return;
+    }
+
+    carica();
+    caricaConfrontoFogli();
+  }
+
+  // ==================== CARICAMENTO FOGLIO SELEZIONATO ====================
+  async function carica() {
+    const foglio = document.getElementById("selFoglio").value;
+    if (!foglio) return;
+
+    const dataInizio = document.getElementById("dataInizio").value;
+    const dataFine = document.getElementById("dataFine").value;
+
+    const container = document.getElementById("risultatoContainer");
+    container.innerHTML = '<div class="messaggio">Caricamento fatture...</div>';
+
+    try {
+      const range = `'${foglio}'!${RANGE_COLONNE}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.error) {
+        container.innerHTML = `<div class="messaggio">Non è stato possibile leggere questo foglio: ${json.error.message}</div>`;
+        return;
+      }
+
+      let records = costruisciRecord((json.values || []).slice(1));
+
+      // --- Filtro intervallo date ---
+      if (dataInizio || dataFine) {
+        const inizio = dataInizio ? new Date(dataInizio) : null;
+        const fine = dataFine ? new Date(dataFine) : null;
+        records = records.filter(r => {
+          const d = serialeADate(r[CAMPO_DATA_FILTRO]);
+          if (!d) return false;
+          if (inizio && d < inizio) return false;
+          if (fine && d > fine) return false;
+          return true;
+        });
+      }
+
+      const totaleNelPeriodo = records.length;
+      const nonEmesseNelPeriodo = records.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === "non emessa").length;
+      const emesseNelPeriodo = records.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === "emessa").length;
+
+      // --- Filtro stato (per la lista finale) ---
+      let listaFinale = records;
+      if (statoSelezionato !== "Tutte") {
+        listaFinale = listaFinale.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === statoSelezionato.toLowerCase());
+      }
+
+      listaFinale.sort((a, b) => (serialeADate(a[CAMPO_DATA_FILTRO]) || 0) - (serialeADate(b[CAMPO_DATA_FILTRO]) || 0));
+
+      const totaleImportoSelezione = listaFinale.reduce((acc, r) => acc + parseImporto(r[CAMPO_IMPORTO]), 0);
+
+      aggiornaKPI({ totaleNelPeriodo, nonEmesseNelPeriodo, emesseNelPeriodo, totaleImportoSelezione });
+      aggiornaGraficoStato({ nonEmesseNelPeriodo, emesseNelPeriodo });
+      renderTabella(listaFinale);
+
+    } catch (err) {
+      container.innerHTML = `<div class="messaggio">Errore di connessione: ${err}</div>`;
+    }
+  }
+
+  // ==================== CONFRONTO TRA TUTTI I FOGLI ====================
+  async function caricaConfrontoFogli() {
+    if (nomiFogliValidi.length === 0) return;
+
+    const riepilogoEl = document.getElementById("riepilogoFogli");
+
+    try {
+      const parametriRange = nomiFogliValidi
+        .map(n => `ranges=${encodeURIComponent("'" + n + "'!" + RANGE_COLONNE)}`)
+        .join("&");
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${parametriRange}&key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE`;
+
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.error) {
+        riepilogoEl.innerHTML = `<div class="messaggio">Confronto non disponibile: ${json.error.message}</div>`;
+        return;
+      }
+
+      const risultatiPerFoglio = nomiFogliValidi.map((nome, i) => {
+        const righeGrezze = (json.valueRanges[i].values || []).slice(1);
+        const records = costruisciRecord(righeGrezze);
+        const totaleImporto = records.reduce((acc, r) => acc + parseImporto(r[CAMPO_IMPORTO]), 0);
+        const nonEmesse = records.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === "non emessa").length;
+        const emesse = records.filter(r => String(r["Emissione fattura"]).trim().toLowerCase() === "emessa").length;
+        return { nome, totaleImporto, nonEmesse, emesse };
+      });
+
+      aggiornaGraficoConfronto(risultatiPerFoglio);
+      renderRiepilogo(risultatiPerFoglio);
+
+    } catch (err) {
+      riepilogoEl.innerHTML = `<div class="messaggio">Confronto non disponibile: ${err}</div>`;
+    }
+  }
+
+  // ==================== KPI ====================
+  function aggiornaKPI(d) {
+    document.getElementById("kpiNonEmesse").textContent = d.nonEmesseNelPeriodo;
+    document.getElementById("kpiNonEmesseLabel").textContent =
+      `Fatture da emettere (su ${d.totaleNelPeriodo} nel periodo, ${d.emesseNelPeriodo} già emesse)`;
+
+    document.getElementById("kpiTotaleImporto").textContent = formattaEuro(d.totaleImportoSelezione);
+    document.getElementById("kpiTotaleLabel").textContent = "Totale Tot/parz. nella selezione corrente";
+  }
+
+  // ==================== GRAFICO STATO (donut) ====================
+  function aggiornaGraficoStato(d) {
+    const ctx = document.getElementById("graficoStato");
+    if (chartStato) chartStato.destroy();
+    chartStato = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: ["Non emesse", "Emesse"],
+        datasets: [{ data: [d.nonEmesseNelPeriodo, d.emesseNelPeriodo], backgroundColor: ["#E4483C", "#1FAA6D"], borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11, family: "Inter" } } } }
+      }
+    });
+  }
+
+  // ==================== GRAFICO CONFRONTO (colonne + linea) ====================
+  function aggiornaGraficoConfronto(risultati) {
+    const ctx = document.getElementById("graficoConfronto");
+    if (chartConfronto) chartConfronto.destroy();
+    chartConfronto = new Chart(ctx, {
+      data: {
+        labels: risultati.map(r => r.nome),
+        datasets: [
+          {
+            type: "bar",
+            label: "Totale importo (€)",
+            data: risultati.map(r => r.totaleImporto),
+            backgroundColor: "#1B4FD8",
+            yAxisID: "yImporto",
+            borderRadius: 6
+          },
+          {
+            type: "line",
+            label: "Fatture non emesse",
+            data: risultati.map(r => r.nonEmesse),
+            borderColor: "#E4483C",
+            backgroundColor: "#E4483C",
+            yAxisID: "yConteggio",
+            tension: 0.3,
+            pointRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11, family: "Inter" } } } },
+        scales: {
+          yImporto: { position: "left", ticks: { callback: v => "€" + v.toLocaleString("it-IT") } },
+          yConteggio: { position: "right", grid: { drawOnChartArea: false }, ticks: { precision: 0 } }
+        }
+      }
+    });
+  }
+
+  // ==================== RIEPILOGO PER FOGLIO ====================
+  function renderRiepilogo(risultati) {
+    const el = document.getElementById("riepilogoFogli");
+    el.innerHTML = risultati.map(r => `
+      <div class="riga-riepilogo">
+        <span class="nome-foglio">${r.nome}</span>
+        <span class="dettagli">
+          <span>${r.emesse} emesse</span>
+          <span>${r.nonEmesse} da emettere</span>
+        </span>
+        <span class="totale-euro">${formattaEuro(r.totaleImporto)}</span>
+      </div>
+    `).join("");
+  }
+
+  // ==================== TABELLA RISULTATI ====================
+  function renderTabella(data) {
+    const container = document.getElementById("risultatoContainer");
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="messaggio">Nessuna fattura trovata con questi filtri. Prova ad ampliare il periodo di date o cambiare stato.</div>';
+      return;
+    }
+
+    const colonne = Object.keys(data[0]);
+    let html = "<table><thead><tr>";
+    colonne.forEach(c => html += `<th>${c}</th>`);
+    html += "</tr></thead><tbody>";
+
+    data.forEach(riga => {
+      html += "<tr>";
+      colonne.forEach(c => {
+        let valore = riga[c];
+
+        if (c === "Emissione fattura") {
+          const emessa = String(valore).trim().toLowerCase() === "emessa";
+          valore = `<span class="badge ${emessa ? "emessa" : "non-emessa"}">${valore}</span>`;
+        } else if (c === "Fine progetto" || c === "Pagamento fattura") {
+          valore = formattaData(valore) || "";
+        } else if (c === "Tot/parz.") {
+          valore = `<span class="valore-euro">${formattaEuro(parseImporto(valore))}</span>`;
+        }
+
+        html += `<td>${valore}</td>`;
+      });
+      html += "</tr>";
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+  }
+
+  inizializza();
+</script>
+</body>
+</html>
